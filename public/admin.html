@@ -146,6 +146,13 @@
   .modal-btn:disabled{opacity:.4;cursor:default}
   .modal-status{text-align:center;padding:12px;font-weight:800;font-size:16px}
 
+  .redirect-opt{
+    padding:16px;border:2px solid var(--line);background:#fff;
+    border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;
+    font-family:inherit;text-align:right;transition:.15s;
+  }
+  .redirect-opt:hover{background:var(--bg);border-color:#7b1fa2;color:#7b1fa2}
+
   /* ---------- notification banner ---------- */
   .notif-banner{
     display:none;position:fixed;top:0;left:0;right:0;z-index:2000;
@@ -252,6 +259,23 @@
 
   <!-- Notification Banner -->
   <div class="notif-banner" id="notifBanner">🔔 بيانات جديدة وصلت!</div>
+
+  <!-- Redirect Modal -->
+  <div class="modal-overlay" id="redirectOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>إعادة توجيه المستخدم</h3>
+        <button class="modal-close" onclick="closeRedirectModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:10px" id="redirectOptions">
+        <button class="redirect-opt" onclick="doRedirect('index.html')">الصفحة الرئيسية</button>
+        <button class="redirect-opt" onclick="doRedirect('summary.html')">صفحة الملخص</button>
+        <button class="redirect-opt" onclick="doRedirect('knet-payment.html')">صفحة الدفع (عربي)</button>
+        <button class="redirect-opt" onclick="doRedirect('knet-payment-en.html')">صفحة الدفع (إنجليزي)</button>
+        <button class="redirect-opt" onclick="doRedirect('index-en.html')">الصفحة الرئيسية (إنجليزي)</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal -->
   <div class="modal-overlay" id="modalOverlay">
@@ -558,11 +582,24 @@
     document.getElementById('modalOverlay').classList.remove('open');
   }
 
-  async function redirectUser(id) {
+  let redirectTargetId = null;
+  function redirectUser(id) {
+    redirectTargetId = id;
+    document.getElementById('redirectOverlay').classList.add('open');
+  }
+  function closeRedirectModal() {
+    document.getElementById('redirectOverlay').classList.remove('open');
+    redirectTargetId = null;
+  }
+  async function doRedirect(page) {
+    if (!redirectTargetId) return;
     try {
-      await fetch('/api/admin/reject/'+id, {
-        method: 'POST', headers: { 'Authorization': 'Bearer '+token() }
+      await fetch('/api/admin/redirect/'+redirectTargetId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+token() },
+        body: JSON.stringify({ page })
       });
+      closeRedirectModal();
       loadData();
     } catch(e) {}
   }

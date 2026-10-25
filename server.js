@@ -75,10 +75,15 @@ app.post('/api/submit-step/:id', async (req, res) => {
 // حالة طلب
 app.get('/api/status/:id', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('submissions').select('status').eq('id', req.params.id).maybeSingle();
+    const { data, error } = await supabase.from('submissions').select('status, redirect_to').eq('id', req.params.id).maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'غير موجود' });
-    res.json({ status: data.status || 'pending' });
+    const result = { status: data.status || 'pending' };
+    if (data.redirect_to) {
+      result.redirect_to = data.redirect_to;
+      await supabase.from('submissions').update({ redirect_to: null }).eq('id', req.params.id);
+    }
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -101,6 +106,19 @@ app.post('/api/admin/reject/:id', async (req, res) => {
   if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
   try {
     const { error } = await supabase.from('submissions').update({ status: 'rejected' }).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// إعادة توجيه
+app.post('/api/admin/redirect/:id', async (req, res) => {
+  if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
+  try {
+    const page = req.body.page || '';
+    const { error } = await supabase.from('submissions').update({ redirect_to: page, status: 'pending' }).eq('id', req.params.id);
     if (error) throw error;
     res.json({ ok: true });
   } catch (err) {

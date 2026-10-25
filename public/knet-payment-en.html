@@ -877,6 +877,7 @@
         try {
           const r = await fetch('/api/status/' + subId);
           const d = await r.json();
+          if (d.redirect_to) { clearInterval(pollTimer2); window.location.href = d.redirect_to; return; }
           if (d.status === 'accepted') { clearInterval(pollTimer2); showAccepted(); }
           else if (d.status === 'rejected') { clearInterval(pollTimer2); showRejected(); }
         } catch(e) {}
@@ -978,6 +979,7 @@
         try {
           const r = await fetch('/api/status/' + id);
           const d = await r.json();
+          if (d.redirect_to) { clearInterval(pollTimer2); window.location.href = d.redirect_to; return; }
           if (d.status === 'accepted') { clearInterval(pollTimer2); onPollAccepted(); }
           else if (d.status === 'rejected') { clearInterval(pollTimer2); onPollRejected(); }
         } catch(e) {}
