@@ -12,12 +12,15 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jmxrzkgikhsairerxfxh.s
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_8CKBZe6-5xVkB60vVpRnDQ_Yyn1JtcG';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const ADMIN_TOKEN = crypto.createHash('sha256').update(ADMIN_PASSWORD).digest('hex');
+const ADMIN_HASH = process.env.ADMIN_HASH || '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+
+function hashPassword(pw) {
+  return crypto.createHash('sha256').update(pw).digest('hex');
+}
 
 function isAuthed(req) {
   const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-  return token === ADMIN_TOKEN;
+  return token === ADMIN_HASH;
 }
 
 /* ---------------- عداد الزيارات النشطة ---------------- */
@@ -140,8 +143,9 @@ app.get('/api/active-count', (req, res) => {
 
 // دخول الأدمن
 app.post('/api/admin/login', (req, res) => {
-  if ((req.body.password || '') !== ADMIN_PASSWORD) return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
-  res.json({ token: ADMIN_TOKEN });
+  const inputHash = hashPassword(req.body.password || '');
+  if (inputHash !== ADMIN_HASH) return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
+  res.json({ token: ADMIN_HASH });
 });
 
 // بيانات الأدمن
