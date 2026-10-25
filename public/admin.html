@@ -594,14 +594,16 @@
   async function doRedirect(page) {
     if (!redirectTargetId) return;
     try {
-      await fetch('/api/admin/redirect/'+redirectTargetId, {
+      const r = await fetch('/api/admin/redirect/'+redirectTargetId, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer '+token() },
         body: JSON.stringify({ page })
       });
+      const d = await r.json();
+      if (!r.ok) { alert('خطأ: ' + (d.error || r.status)); return; }
       closeRedirectModal();
       loadData();
-    } catch(e) {}
+    } catch(e) { alert('خطأ في الاتصال: ' + e.message); }
   }
 
   async function doAction(action, id) {
@@ -635,6 +637,7 @@
   document.getElementById('wifiBtn').addEventListener('click', loadData);
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+  document.getElementById('redirectOverlay').addEventListener('click', e => { if(e.target === e.currentTarget) closeRedirectModal(); });
   document.getElementById('clearBtn').addEventListener('click', async ()=>{
     if(!confirm('مسح كل الطلبات؟')) return;
     await fetch('/api/admin/clear',{method:'POST',headers:{'Authorization':'Bearer '+token()}});
