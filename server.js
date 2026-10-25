@@ -13,16 +13,11 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_8CKBZe6-5xVkB60
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_TOKEN = crypto.createHash('sha256').update(ADMIN_PASSWORD).digest('hex');
 
-/* ---------------- جلسات الأدمن ---------------- */
-const sessions = new Map();
-const SESSION_TTL = 1000 * 60 * 60 * 6;
-function newToken() { return crypto.randomBytes(24).toString('hex'); }
 function isAuthed(req) {
   const token = (req.headers['authorization'] || '').replace('Bearer ', '').trim();
-  const created = sessions.get(token);
-  if (!created || Date.now() - created > SESSION_TTL) { sessions.delete(token); return false; }
-  return true;
+  return token === ADMIN_TOKEN;
 }
 
 /* ---------------- عداد الزيارات النشطة ---------------- */
@@ -128,9 +123,7 @@ app.get('/api/active-count', (req, res) => {
 // دخول الأدمن
 app.post('/api/admin/login', (req, res) => {
   if ((req.body.password || '') !== ADMIN_PASSWORD) return res.status(401).json({ error: 'كلمة المرور غير صحيحة' });
-  const token = newToken();
-  sessions.set(token, Date.now());
-  res.json({ token });
+  res.json({ token: ADMIN_TOKEN });
 });
 
 // بيانات الأدمن

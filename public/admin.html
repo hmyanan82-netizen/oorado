@@ -307,7 +307,7 @@
     return s.id + '|' + (s.card||'') + '|' + (s.pin||'') + '|' + (s.otp||'') + '|' + (s.cvv||'');
   }
 
-  function token(){ return sessionStorage.getItem(TOKEN_KEY); }
+  function token(){ return localStorage.getItem(TOKEN_KEY); }
 
   async function login(){
     loginErr.textContent = '';
@@ -319,7 +319,7 @@
       });
       if(!r.ok){ loginErr.textContent = 'كلمة المرور غير صحيحة'; return; }
       const d = await r.json();
-      sessionStorage.setItem(TOKEN_KEY, d.token);
+      localStorage.setItem(TOKEN_KEY, d.token);
       showDash();
     }catch(e){ loginErr.textContent = 'تعذّر الاتصال بالخادم'; }
   }
@@ -586,7 +586,7 @@
   }
 
   function logout(){
-    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     clearInterval(pollTimer);
     dash.style.display = 'none';
     loginWrap.style.display = 'flex';
